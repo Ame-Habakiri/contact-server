@@ -6,79 +6,84 @@ const fetch = require('node-fetch');
 
 const app = express();
 
-// === Middleware Setup ===
+// === Middleware ===
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// === Rate Limiting ===
+// === Rate Limiting Middleware ===
 const limiter = rateLimit({
-  windowMs: 60 * 1000, // 1 minute window
-  max: 5, // limit each IP to 5 requests per windowMs
-  message: 'Too many submissions. Please try again later.',
+  windowMs: 60 * 1000, // 1 minute
+  max: 5, // limit per IP
+  message: 'Too many submissions. Please wait a minute and try again.',
 });
 app.use('/submit-form', limiter);
 
-// === Utility: Email Validator ===
+// === Utility: Validate Email Format ===
 function isValidEmail(email) {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   return emailRegex.test(email);
 }
 
-// === POST Handler for Contact Form ===
+// === POST Route: /submit-form ===
 app.post('/submit-form', async (req, res) => {
   const { name, email, subject, message, honeypot } = req.body;
 
-  // === Honeypot anti-spam trap ===
+  // === Anti-spam honeypot check ===
   if (honeypot && honeypot.trim() !== '') {
     return res.status(400).json({ error: 'Spam detected.' });
   }
 
-  // === Input Validation ===
+  // === Required Fields Check ===
   if (!name || !email || !message) {
     return res.status(400).json({ error: 'Name, Email, and Message are required.' });
   }
 
+  // === Validate Email Format ===
   if (!isValidEmail(email)) {
     return res.status(400).json({ error: 'Invalid email address.' });
   }
 
-  if (!process.env.DISCORD_WEBHOOK || !process.env.DISCORD_WEBHOOK.startsWith('https://')) {
-    return res.status(500).json({ error: 'Invalid or missing Discord webhook URL in environment variables.' });
+  // === Check for Discord Webhook Configuration ===
+  const webhookURL = process.env.DISCORD_WEBHOOK;
+  if (!webhookURL || !webhookURL.startsWith('https://')) {
+    return res.status(500).json({ error: 'Discord webhook is missing or invalid in environment variables.' });
   }
 
-  // === Format Message Content ===
+  // === Build Discord Message ===
   const timestamp = new Date().toLocaleString();
-  const content = `
-📩 **New Contact Submission**
+  const discordMessage = {
+    content: `
+📬 **New Contact Form Submission**
 **Name:** ${name}
 **Email:** ${email}
 **Subject:** ${subject || '(No subject)'}
 **Message:** ${message}
-🕒 **Sent At:** ${timestamp}
-  `;
+🕒 **Submitted at:** ${timestamp}
+    `
+  };
 
   // === Send to Discord Webhook ===
   try {
-    const response = await fetch(process.env.DISCORD_WEBHOOK, {
+    const discordResponse = await fetch(webhookURL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ content }),
+      body: JSON.stringify(discordMessage),
     });
 
-    if (response.ok) {
-      res.status(200).json({ message: 'Message sent successfully!' });
+    if (discordResponse.ok) {
+      return res.status(200).json({ message: '✅ Message sent successfully!' });
     } else {
-      const error = await response.text();
-      res.status(500).json({ error: 'Failed to send to Discord: ' + error });
+      const errText = await discordResponse.text();
+      return res.status(502).json({ error: 'Failed to send to Discord: ' + errText });
     }
   } catch (err) {
-    console.error('Error sending to Discord:', err);
-    res.status(500).json({ error: 'Server error. Try again later.' });
+    console.error('❌ Error posting to Discord:', err);
+    return res.status(500).json({ error: 'Internal server error. Please try again later.' });
   }
 });
 
-// === Start Server ===
+// === Start the Server ===
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`🚀 Server running on http://localhost:${PORT}`);
