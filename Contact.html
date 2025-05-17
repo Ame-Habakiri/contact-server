@@ -2,24 +2,107 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Contact Us</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Contact Us - AMX</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: #f9f9f9;
+      margin: 0;
+      padding: 0 20px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+    }
+    .contact-wrapper {
+      background: #fff;
+      max-width: 480px;
+      width: 100%;
+      padding: 30px 35px;
+      box-shadow: 0 6px 18px rgba(0,0,0,0.1);
+      border-radius: 10px;
+    }
+    h2 {
+      text-align: center;
+      color: #333;
+      margin-bottom: 25px;
+      font-weight: 700;
+    }
+    label {
+      display: block;
+      margin-bottom: 6px;
+      font-weight: 600;
+      color: #555;
+      margin-top: 15px;
+    }
+    input[type="text"],
+    input[type="email"],
+    input[type="file"],
+    textarea {
+      width: 100%;
+      padding: 10px 12px;
+      border-radius: 6px;
+      border: 1.5px solid #ccc;
+      font-size: 15px;
+      font-family: inherit;
+      box-sizing: border-box;
+      transition: border-color 0.3s ease;
+    }
+    input[type="text"]:focus,
+    input[type="email"]:focus,
+    textarea:focus,
+    input[type="file"]:focus {
+      border-color: #007bff;
+      outline: none;
+    }
+    textarea {
+      min-height: 110px;
+      resize: vertical;
+    }
+    button {
+      margin-top: 25px;
+      width: 100%;
+      background-color: #007bff;
+      border: none;
+      padding: 14px;
+      color: white;
+      font-size: 18px;
+      font-weight: 600;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background-color 0.3s ease;
+    }
+    button:hover {
+      background-color: #0056b3;
+    }
+  </style>
 </head>
 <body>
-  <h2>Contact Us</h2>
-  <form id="contactForm" enctype="multipart/form-data">
-    <!-- Honeypot for spam -->
-    <input type="text" name="honeypot" style="display:none" autocomplete="off" />
+  <div class="contact-wrapper">
+    <h2>Contact Us</h2>
+    <form id="contactForm" enctype="multipart/form-data">
+      <!-- Honeypot for spam -->
+      <input type="text" name="honeypot" style="display:none" autocomplete="off" />
 
-    <label>Name: <input type="text" name="name" required /></label><br />
-    <label>Email: <input type="email" name="email" required /></label><br />
-    <label>Subject: <input type="text" name="subject" /></label><br />
-    <label>Message:<br />
-      <textarea name="message" required></textarea>
-    </label><br />
-    <label>Attach file: <input type="file" name="file" /></label><br /><br />
-    <button type="submit">Send</button>
-  </form>
+      <label for="name">Name</label>
+      <input type="text" id="name" name="name" required placeholder="Your full name" />
+
+      <label for="email">Email</label>
+      <input type="email" id="email" name="email" required placeholder="you@example.com" />
+
+      <label for="subject">Subject</label>
+      <input type="text" id="subject" name="subject" placeholder="Subject (optional)" />
+
+      <label for="message">Message</label>
+      <textarea id="message" name="message" required placeholder="Write your message here..."></textarea>
+
+      <label for="file">Attach file (optional)</label>
+      <input type="file" id="file" name="file" />
+
+      <button type="submit">Send Message</button>
+    </form>
+  </div>
 
   <script>
     document.getElementById('contactForm').addEventListener('submit', async function(e) {
