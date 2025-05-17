@@ -2,89 +2,77 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const rateLimit = require('express-rate-limit');
+const multer = require('multer');
 const fetch = require('node-fetch');
+const path = require('path');
 
 const app = express();
-
-// === Middleware ===
 app.use(cors());
 app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.static('public'));
+app.use('/uploads', express.static('uploads'));
 
-// === Rate Limiting Middleware ===
+// Rate limiting
 const limiter = rateLimit({
-  windowMs: 60 * 1000, // 1 minute
-  max: 5, // limit per IP
-  message: 'Too many submissions. Please wait a minute and try again.',
+  windowMs: 60 * 1000,
+  max: 5,
+  message: 'Too many submissions. Please try again later.',
 });
 app.use('/submit-form', limiter);
 
-// === Utility: Validate Email Format ===
-function isValidEmail(email) {
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  return emailRegex.test(email);
-}
+// Multer setup
+const storage = multer.diskStorage({
+  destination: 'uploads/',
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
+    cb(null, uniqueSuffix + path.extname(file.originalname));
+  },
+});
+const upload = multer({ storage });
 
-// === POST Route: /submit-form ===
-app.post('/submit-form', async (req, res) => {
+app.post('/submit-form', upload.single('file'), async (req, res) => {
   const { name, email, subject, message, honeypot } = req.body;
 
-  // === Anti-spam honeypot check ===
   if (honeypot && honeypot.trim() !== '') {
-    return res.status(400).json({ error: 'Spam detected.' });
+    return res.status(400).json({ error: 'Spam detected' });
   }
 
-  // === Required Fields Check ===
   if (!name || !email || !message) {
-    return res.status(400).json({ error: 'Name, Email, and Message are required.' });
+    return res.status(400).json({ error: 'Missing required fields' });
   }
 
-  // === Validate Email Format ===
-  if (!isValidEmail(email)) {
-    return res.status(400).json({ error: 'Invalid email address.' });
-  }
+  const file = req.file;
+  const fileUrl = file ? `${req.protocol}://${req.get('host')}/uploads/${file.filename}` : 'None';
 
-  // === Check for Discord Webhook Configuration ===
-  const webhookURL = process.env.DISCORD_WEBHOOK;
-  if (!webhookURL || !webhookURL.startsWith('https://')) {
-    return res.status(500).json({ error: 'Discord webhook is missing or invalid in environment variables.' });
-  }
-
-  // === Build Discord Message ===
-  const timestamp = new Date().toLocaleString();
-  const discordMessage = {
-    content: `
-📬 **New Contact Form Submission**
+  const content = `
+📩 **New Contact Form Submission**
 **Name:** ${name}
 **Email:** ${email}
 **Subject:** ${subject || '(No subject)'}
 **Message:** ${message}
-🕒 **Submitted at:** ${timestamp}
-    `
-  };
+📎 **Attachment:** ${file ? `[Download File](${fileUrl})` : 'None'}
+🕒 **Sent At:** ${new Date().toLocaleString()}
+  `;
 
-  // === Send to Discord Webhook ===
+  if (!process.env.DISCORD_WEBHOOK) {
+    return res.status(500).json({ error: 'Discord webhook URL is not configured.' });
+  }
+
   try {
-    const discordResponse = await fetch(webhookURL, {
+    const response = await fetch(process.env.DISCORD_WEBHOOK, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(discordMessage),
+      body: JSON.stringify({ content }),
     });
 
-    if (discordResponse.ok) {
-      return res.status(200).json({ message: '✅ Message sent successfully!' });
+    if (response.ok) {
+      res.status(200).json({ message: 'Message sent successfully!' });
     } else {
-      const errText = await discordResponse.text();
-      return res.status(502).json({ error: 'Failed to send to Discord: ' + errText });
+      res.status(500).json({ error: 'Failed to send to Discord' });
     }
   } catch (err) {
-    console.error('❌ Error posting to Discord:', err);
-    return res.status(500).json({ error: 'Internal server error. Please try again later.' });
+    res.status(500).json({ error: err.message });
   }
 });
 
-// === Start the Server ===
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`🚀 Server running on http://localhost:${PORT}`);
-});
+app.listen(3000, () => console.log('🚀 Server running on http://localhost:3000'));
